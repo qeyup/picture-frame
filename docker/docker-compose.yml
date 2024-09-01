@@ -5,9 +5,11 @@ services:
     image: "picture_frame_dwi"
     volumes:
       - ../:/home/docker/workspace
+      - ../.ssh/:/home/docker/.ssh
       - /tmp/.X11-unix/:/tmp/.X11-unix/
     environment:
       - DISPLAY=:0
+    entrypoint: ["code", "-w", "/home/docker/workspace"]
     network_mode: "bridge"
     stdin_open: true 
     tty: true

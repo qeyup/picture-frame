@@ -325,9 +325,6 @@ USER docker
 WORKDIR /home/docker
 VOLUME /home/docker/workspace
 
-ENTRYPOINT ["code", "-w", "/home/docker/workspace"]
-#CMD [""]
-
 
 
 

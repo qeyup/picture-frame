@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QSizePol
 from PyQt5.QtCore import Qt, QByteArray, QBuffer
 from PyQt5.QtGui import QColor, QPalette, QPixmap, QGuiApplication, QImage, QImageReader
 
-version = "0.1.0"
+version = "0.2.0"
 
 class pictureBroker():
 
@@ -76,11 +76,8 @@ class pictureFrame(QWidget):
         self.__buildLayout(fullscreen)
 
         self.d2d = d2dcn.d2d()
-        self.d2d.onCommandUpdate = self.__newBrokerCommand
-
-
-    def __newBrokerCommand(self, command):
-        self.__command = command
+        self.__command = self.d2d.getAvailableComands(name=pictureBroker.command.GET_IMAGE)[0]
+        print("Started")
 
 
     def __buildLayout(self, fullscreen):
@@ -118,15 +115,17 @@ class pictureFrame(QWidget):
 
     def __configCommands(self):
 
-        response = {}
+        response = d2dcn.commandArgsDef()
 
-        request = {}
+        request = d2dcn.commandArgsDef()
 
         self.d2d.addServiceCommand(lambda args : self.__requestImage(args),
                                     pictureFrame.command.CHANGE_IMAGE,
-                                    request, response, d2dcn.d2dConstants.category.GENERIC,
-                                    protocol=d2dcn.d2dConstants.commandProtocol.JSON_UDP,
+                                    request, response, d2dcn.constants.category.GENERIC,
+                                    protocol=d2dcn.constants.commandProtocol.JSON_UDP,
                                     timeout=pictureFrame.param.CHANGE_IMAGE_TIMEOUT)
+
+        self.current_image = self.d2d.addInfoWriter(pictureFrame.field.IMAGE_PATH, d2dcn.constants.valueTypes.STRING, d2dcn.constants.category.GENERIC)
 
 
     def __loadImage(self, base64_data):
@@ -160,6 +159,7 @@ class pictureFrame(QWidget):
 
     def __requestImage(self, args=None):
         if self.__command:
+            self.d2d.enableCommand(pictureFrame.command.CHANGE_IMAGE, False)
 
             command_arg = {}
             command_arg[pictureBroker.field.ID] = self.__frame_id
@@ -172,10 +172,11 @@ class pictureFrame(QWidget):
 
                 self.__loadImage(bytes(image_data, 'utf-8'))
 
-                self.d2d.publishInfo(pictureFrame.field.IMAGE_PATH, image_data_path, d2dcn.d2dConstants.category.GENERIC)
+                self.current_image.value = image_data_path
 
                 self.__current = 0
 
+            self.d2d.enableCommand(pictureFrame.command.CHANGE_IMAGE, True)
             return {}
 
         else:
@@ -184,7 +185,6 @@ class pictureFrame(QWidget):
 
     def __runFrame(self):
 
-        self.d2d.subscribeComands(command=pictureBroker.command.GET_IMAGE)
         self.__configCommands()
 
         while self.__run:
