@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QSizePol
 from PyQt5.QtCore import Qt, QByteArray, QBuffer
 from PyQt5.QtGui import QColor, QPalette, QPixmap, QGuiApplication, QImage, QImageReader
 
-version = "0.2.0"
+version = "0.2.1"
 
 class pictureBroker():
 
@@ -72,7 +72,6 @@ class pictureFrame(QWidget):
         self.__frame_id = frame_id
         self.__update_time = update_time
         self.__vertical_orientation = vertical_orientation
-        self.__current = 0
         self.__buildLayout(fullscreen)
 
         self.d2d = d2dcn.d2d()
@@ -119,7 +118,7 @@ class pictureFrame(QWidget):
 
         request = d2dcn.commandArgsDef()
 
-        self.d2d.addServiceCommand(lambda args : self.__requestImage(args),
+        self.d2d.addServiceCommand(lambda args : self.__reqCommand(args),
                                     pictureFrame.command.CHANGE_IMAGE,
                                     request, response, d2dcn.constants.category.GENERIC,
                                     protocol=d2dcn.constants.commandProtocol.JSON_UDP,
@@ -157,8 +156,17 @@ class pictureFrame(QWidget):
             return False
 
 
-    def __requestImage(self, args=None):
+    def __reqCommand(self, args):
+        if self.__request_mutex.locked():
+            self.__request_mutex.release()
+
+        return {}
+
+
+    def __requestImage(self):
+
         if self.__command:
+
             self.d2d.enableCommand(pictureFrame.command.CHANGE_IMAGE, False)
 
             command_arg = {}
@@ -166,7 +174,7 @@ class pictureFrame(QWidget):
             command_arg[pictureBroker.field.VERTICAL_ORIENTATION] = self.__vertical_orientation
 
             response = self.__command.call(command_arg)
-            if response:
+            if response.success:
                 image_data = response[pictureBroker.field.IMAGE]
                 image_data_path = response[pictureBroker.field.IMAGE_PATH]
 
@@ -174,13 +182,11 @@ class pictureFrame(QWidget):
 
                 self.current_image.value = image_data_path
 
-                self.__current = 0
+
+            else:
+                print("Error!", response.error)
 
             self.d2d.enableCommand(pictureFrame.command.CHANGE_IMAGE, True)
-            return {}
-
-        else:
-            return None
 
 
     def __runFrame(self):
@@ -189,14 +195,12 @@ class pictureFrame(QWidget):
 
         while self.__run:
 
+            # Sleep
+            self.__request_mutex.acquire(timeout=self.__update_time)
+
+
+            # Request
             self.__requestImage()
-
-
-            while self.__update_time - self.__current > 0:
-                time.sleep(self.__update_time)
-                self.__current += 1
-
-
 
 
     def runFrame(self):
